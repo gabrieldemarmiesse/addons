@@ -14,7 +14,7 @@ RUN pip install git+https://github.com/timothycrosley/isort.git@a04700812bd4b9eb
 # hack to make for isort to recognize addons as first party
 RUN cd /tmp && \
     git clone https://github.com/tensorflow/addons.git && \
-    pip install -e ./addons
+    TF_ADDONS_NO_BUILD=1 pip install -e ./addons
 
 WORKDIR /addons
 
