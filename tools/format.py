@@ -22,7 +22,11 @@ def _run_format_and_flake8():
         files_changed = True
 
     try:
-        
+        check_bash_call("isort --check-only ./tensorflow_addons")
+    except CalledProcessError:
+        check_bash_call("isort ./tensorflow_addons")
+        files_changed = True
+
     # todo: find a way to check if files changed
     # see https://github.com/DoozyX/clang-format-lint-action for inspiration
     check_bash_call(
