@@ -9,6 +9,8 @@ RUN bash buildifier.sh
 COPY tools/ci_build/install/clang-format.sh ./clang-format.sh
 RUN bash clang-format.sh
 
+RUN pip install git+https://github.com/timothycrosley/isort.git@a04700812bd4b9eb687065d1199b52bb8e045774
+
 WORKDIR /addons
 
 

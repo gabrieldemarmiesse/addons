@@ -21,6 +21,8 @@ def _run_format_and_flake8():
         check_bash_call("buildifier -r .")
         files_changed = True
 
+    try:
+        
     # todo: find a way to check if files changed
     # see https://github.com/DoozyX/clang-format-lint-action for inspiration
     check_bash_call(
