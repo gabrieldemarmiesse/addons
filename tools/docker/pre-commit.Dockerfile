@@ -11,6 +11,11 @@ RUN bash clang-format.sh
 
 RUN pip install git+https://github.com/timothycrosley/isort.git@a04700812bd4b9eb687065d1199b52bb8e045774
 
+# hack to make for isort to recognize addons as first party
+RUN cd /tmp && \
+    git clone https://github.com/tensorflow/addons.git && \
+    pip install -e ./addons
+
 WORKDIR /addons
 
 
