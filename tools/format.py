@@ -10,6 +10,12 @@ def _run_format_and_flake8():
     files_changed = False
 
     try:
+        check_bash_call("isort --check-only ./tensorflow_addons")
+    except CalledProcessError:
+        check_bash_call("isort ./tensorflow_addons")
+        files_changed = True
+
+    try:
         check_bash_call("python -m black --check ./")
     except CalledProcessError:
         check_bash_call("python -m black ./")
@@ -19,12 +25,6 @@ def _run_format_and_flake8():
         check_bash_call("buildifier -mode=check -r .")
     except CalledProcessError:
         check_bash_call("buildifier -r .")
-        files_changed = True
-
-    try:
-        check_bash_call("isort --check-only ./tensorflow_addons")
-    except CalledProcessError:
-        check_bash_call("isort ./tensorflow_addons")
         files_changed = True
 
     # todo: find a way to check if files changed
