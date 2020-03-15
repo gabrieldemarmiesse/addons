@@ -160,10 +160,17 @@ conda activate my_dev_environement
 Just run from the root:
 
 ```
-pip install -e ./
+pip install -e .[tests]
 ```
 
-It's going to install Addons in editable mode without compiling anything.
+or if you use ZSH, since ZSH is interpreting square brackets:
+
+```
+pip install -e .\[tests\]
+```
+
+It's going to install Addons in editable mode without compiling anything 
+and install the Python packages needed for testing.
 You can modify source files and changes will be seen at the next Python 
 interpreter startup. This command needs to be executed only once. 
 Now, anywhere on your system, if you do `import tensorflow_addons`, it's 

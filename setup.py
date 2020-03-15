@@ -26,6 +26,7 @@ of the community).
 
 import os
 import sys
+from pathlib import Path
 
 from datetime import datetime
 from setuptools import find_packages
@@ -65,6 +66,16 @@ with open("requirements.txt") as f:
     required_pkgs = f.read().splitlines()
 
 
+def get_list_test_deps():
+    test_deps = ["pytest.txt", "flake8.txt", "black.txt", "typedapi.txt"]
+    install_deps_dir = Path("tools/install_deps")
+    list_packages = []
+    for dependency_file in test_deps:
+        list_packages += (install_deps_dir / dependency_file).read_text().splitlines()
+    print(list_packages, file=sys.stderr)
+    return list_packages
+
+
 class BinaryDistribution(Distribution):
     """This class is needed in order to create OS specific wheels."""
 
@@ -82,6 +93,7 @@ setup(
     packages=find_packages(),
     ext_modules=ext_modules,
     install_requires=required_pkgs,
+    extras_require={"tests": get_list_test_deps()},
     include_package_data=True,
     zip_safe=False,
     distclass=BinaryDistribution,
