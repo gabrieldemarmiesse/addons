@@ -203,34 +203,34 @@ def assert_all_equal(array_list1, array_list2):
         np.testing.assert_equal(arr1, arr2)
 
 
-@pytest.mark.parametrize("save_format", ["h5", "tf"])
-def test_serialization(save_format):
-
-    x_np, y_np = get_test_data()
-    inference_model, training_model = train_some_model(x_np, y_np)
-
-    assert inference_model.get_layer("L") == training_model.get_layer("L")
-
-    if save_format == "tf":
-        pytest.skip("TODO: fixme. Some strange bug with TF model saving.")
-
-    new_inference_model = clone(inference_model, save_format)
-    np.testing.assert_equal(
-        inference_model(x_np).numpy(), new_inference_model(x_np).numpy()
+def test_serialization():
+    x_np = np.array(
+        [
+            [
+                # O   B-X  I-X  B-Y  I-Y
+                [0.0, 1.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0, 0.0],
+            ],
+            [
+                # O   B-X  I-X  B-Y  I-Y
+                [0.0, 1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0, 0.0],
+            ],
+        ]
     )
-    assert_all_equal(
-        inference_model.get_layer("L").get_weights(),
-        new_inference_model.get_layer("L").get_weights(),
-    )
+    x_input = tf.keras.layers.Input(shape=x_np.shape[1:])
 
-    new_training_model = clone(training_model, save_format)
-    np.testing.assert_equal(
-        training_model([x_np, y_np]).numpy(), new_training_model([x_np, y_np]).numpy()
-    )
-    assert_all_equal(
-        training_model.get_layer("L").get_weights(),
-        new_training_model.get_layer("L").get_weights(),
-    )
+    decoded_sequence = CRF(5, name="L")(x_input)
+
+    inference_model = tf.keras.Model(x_input, decoded_sequence)
+
+    inference_model.predict(x_np)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        file_path = os.path.join(tmpdir, "my_model.tf")
+        inference_model.save(file_path, save_format="tf")
 
 
 def test_numerical_accuracy():
