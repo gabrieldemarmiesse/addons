@@ -88,16 +88,8 @@ class CRF(tf.keras.layers.Layer):
 
         # global variable
         self.chain_kernel = None
-        self._dense_layer = None
         self.left_boundary = None
         self.right_boundary = None
-
-    def build(self, input_shape):
-        input_shape = tuple(tf.TensorShape(input_shape).as_list())
-
-        # see API docs of InputSpec for more detail
-        self.input_spec = [tf.keras.layers.InputSpec(shape=input_shape)]
-
         self._dense_layer = tf.keras.layers.Dense(
             units=self.units,
             activation=self.activation,
@@ -109,6 +101,12 @@ class CRF(tf.keras.layers.Layer):
             bias_constraint=self.bias_constraint,
             dtype=self.dtype,
         )
+
+    def build(self, input_shape):
+        input_shape = tuple(tf.TensorShape(input_shape).as_list())
+
+        # see API docs of InputSpec for more detail
+        self.input_spec = [tf.keras.layers.InputSpec(shape=input_shape)]
 
         super().build(input_shape)
 
