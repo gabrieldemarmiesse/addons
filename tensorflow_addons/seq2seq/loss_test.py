@@ -357,6 +357,7 @@ def get_test_data():
 
 
 @pytest.mark.xfail(tf.__version__ == "2.2.0-rc1", reason="TODO: Fix this test")
+@pytest.mark.usefixtures("maybe_run_functions_eagerly")
 def test_keras_compatibility():
     """To test the compatibility of SequenceLoss with Keras's built-in
     training loops, we create a fake model which always outputs a pre-
