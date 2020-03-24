@@ -334,7 +334,12 @@ def get_test_data():
         for i in range(sequence_length)
     ]
     logits = tf.stack(logits, axis=1)
-    return batch_size, sequence_length, number_of_classes, logits
+    targets = [
+        tf.constant(i, tf.int32, shape=[batch_size]) for i in range(sequence_length)
+    ]
+    targets = tf.stack(targets, axis=1)
+    targets = tf.one_hot(targets, depth=number_of_classes)
+    return batch_size, sequence_length, number_of_classes, logits, targets
 
 
 @test_utils.run_all_in_graph_and_eager_modes
@@ -350,18 +355,20 @@ class DenseTargetLossTest(tf.test.TestCase):
         parameters, no matter how many steps we train it, it always
         outputs the same loss value.
         """
-        batch_size, sequence_length, number_of_classes, logits = get_test_data()
-        targets = [
-            tf.constant(i, tf.int32, shape=[batch_size]) for i in range(sequence_length)
-        ]
-        self.targets = tf.stack(targets, axis=1)
+        (
+            batch_size,
+            sequence_length,
+            number_of_classes,
+            logits,
+            targets,
+        ) = get_test_data()
+
         weights = [tf.constant(1.0, shape=[batch_size]) for _ in range(sequence_length)]
         self.weights = tf.stack(weights, axis=1)
         # expected_loss = sparse_softmax_cross_entropy_with_logits(targets,
         # logits) where targets = [0, 1, 2],
         # and logits = [[0.5] * 5, [1.5] * 5, [2.5] * 5]
         self.expected_loss = 1.60944
-        self.targets = tf.one_hot(self.targets, depth=number_of_classes)
 
         def return_logits(x):
             logits_single_row = logits[0, :, :]
@@ -384,7 +391,7 @@ class DenseTargetLossTest(tf.test.TestCase):
 
         h = model.fit(
             x,
-            self.targets,
+            targets,
             sample_weight=self.weights,
             batch_size=batch_size,
             steps_per_epoch=1,
