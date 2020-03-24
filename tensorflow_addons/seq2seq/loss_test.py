@@ -325,8 +325,15 @@ class LossTest(tf.test.TestCase):
                 self.evaluate(seq_loss(self.targets, self.logits, self.weights))
 
 
+def get_test_data():
+    batch_size = 2
+    sequence_length = 3
+    number_of_classes = 5
+    return batch_size, sequence_length, number_of_classes
+
+
 @test_utils.run_all_in_graph_and_eager_modes
-class DenseTargetLossTest(LossTest):
+class DenseTargetLossTest(tf.test.TestCase):
     @pytest.mark.xfail(tf.__version__ == "2.2.0-rc1", reason="TODO: Fix this test")
     def testKerasCompatibility(self):
         """To test the compatibility of SequenceLoss with Keras's built-in
@@ -338,8 +345,23 @@ class DenseTargetLossTest(LossTest):
         parameters, no matter how many steps we train it, it always
         outputs the same loss value.
         """
-        self.setup()
-        self.targets = tf.one_hot(self.targets, depth=self.number_of_classes)
+        batch_size, sequence_length, number_of_classes = get_test_data()
+        logits = [
+            tf.constant(i + 0.5, shape=[batch_size, number_of_classes])
+            for i in range(sequence_length)
+        ]
+        self.logits = tf.stack(logits, axis=1)
+        targets = [
+            tf.constant(i, tf.int32, shape=[batch_size]) for i in range(sequence_length)
+        ]
+        self.targets = tf.stack(targets, axis=1)
+        weights = [tf.constant(1.0, shape=[batch_size]) for _ in range(sequence_length)]
+        self.weights = tf.stack(weights, axis=1)
+        # expected_loss = sparse_softmax_cross_entropy_with_logits(targets,
+        # logits) where targets = [0, 1, 2],
+        # and logits = [[0.5] * 5, [1.5] * 5, [2.5] * 5]
+        self.expected_loss = 1.60944
+        self.targets = tf.one_hot(self.targets, depth=number_of_classes)
 
         def return_logits(x):
             batch_size = tf.shape(x)[0]
@@ -349,9 +371,9 @@ class DenseTargetLossTest(LossTest):
             )
             return logits_batch
 
-        inp = tf.keras.layers.Input(shape=(self.sequence_length,))
+        inp = tf.keras.layers.Input(shape=(sequence_length,))
         out = tf.keras.layers.Lambda(
-            return_logits, output_shape=(self.sequence_length, self.number_of_classes),
+            return_logits, output_shape=(sequence_length, number_of_classes),
         )(inp)
         model = tf.keras.models.Model(inp, out)
 
@@ -359,13 +381,13 @@ class DenseTargetLossTest(LossTest):
         model.compile(optimizer="adam", loss=loss_obj, sample_weight_mode="temporal")
 
         # This is a fake input.
-        x = tf.ones(shape=(self.batch_size, self.sequence_length))
+        x = tf.ones(shape=(batch_size, sequence_length))
 
         h = model.fit(
             x,
             self.targets,
             sample_weight=self.weights,
-            batch_size=self.batch_size,
+            batch_size=batch_size,
             steps_per_epoch=1,
         )
 
