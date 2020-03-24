@@ -24,6 +24,37 @@ from tensorflow_addons.seq2seq import loss
 from tensorflow_addons.utils import test_utils
 
 
+def get_test_data():
+    batch_size = 2
+    sequence_length = 3
+    number_of_classes = 5
+    logits = [
+        tf.constant(i + 0.5, shape=[batch_size, number_of_classes])
+        for i in range(sequence_length)
+    ]
+    logits = tf.stack(logits, axis=1)
+    targets = [
+        tf.constant(i, tf.int32, shape=[batch_size]) for i in range(sequence_length)
+    ]
+    targets = tf.stack(targets, axis=1)
+
+    weights = [tf.constant(1.0, shape=[batch_size]) for _ in range(sequence_length)]
+    weights = tf.stack(weights, axis=1)
+    # expected_loss = sparse_softmax_cross_entropy_with_logits(targets,
+    # logits) where targets = [0, 1, 2],
+    # and logits = [[0.5] * 5, [1.5] * 5, [2.5] * 5]
+    expected_loss = 1.60944
+    return (
+        batch_size,
+        sequence_length,
+        number_of_classes,
+        logits,
+        targets,
+        weights,
+        expected_loss,
+    )
+
+
 @test_utils.run_all_in_graph_and_eager_modes
 class LossTest(tf.test.TestCase):
     def setup(self):
@@ -325,37 +356,6 @@ class LossTest(tf.test.TestCase):
                 self.evaluate(seq_loss(self.targets, self.logits, self.weights))
 
 
-def get_test_data():
-    batch_size = 2
-    sequence_length = 3
-    number_of_classes = 5
-    logits = [
-        tf.constant(i + 0.5, shape=[batch_size, number_of_classes])
-        for i in range(sequence_length)
-    ]
-    logits = tf.stack(logits, axis=1)
-    targets = [
-        tf.constant(i, tf.int32, shape=[batch_size]) for i in range(sequence_length)
-    ]
-    targets = tf.stack(targets, axis=1)
-    targets = tf.one_hot(targets, depth=number_of_classes)
-    weights = [tf.constant(1.0, shape=[batch_size]) for _ in range(sequence_length)]
-    weights = tf.stack(weights, axis=1)
-    # expected_loss = sparse_softmax_cross_entropy_with_logits(targets,
-    # logits) where targets = [0, 1, 2],
-    # and logits = [[0.5] * 5, [1.5] * 5, [2.5] * 5]
-    expected_loss = 1.60944
-    return (
-        batch_size,
-        sequence_length,
-        number_of_classes,
-        logits,
-        targets,
-        weights,
-        expected_loss,
-    )
-
-
 @pytest.mark.xfail(tf.__version__ == "2.2.0-rc1", reason="TODO: Fix this test")
 @pytest.mark.usefixtures("maybe_run_functions_eagerly")
 def test_keras_compatibility():
@@ -377,6 +377,7 @@ def test_keras_compatibility():
         weights,
         expected_loss,
     ) = get_test_data()
+    targets = tf.one_hot(targets, depth=number_of_classes)
 
     def return_logits(x):
         logits_single_row = logits[0, :, :]
