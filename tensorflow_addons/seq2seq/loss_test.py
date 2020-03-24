@@ -364,10 +364,9 @@ class DenseTargetLossTest(tf.test.TestCase):
         self.targets = tf.one_hot(self.targets, depth=number_of_classes)
 
         def return_logits(x):
-            batch_size = tf.shape(x)[0]
             logits_single_row = self.logits[0, :, :]
             logits_batch = tf.tile(
-                tf.expand_dims(logits_single_row, 0), [batch_size, 1, 1]
+                tf.expand_dims(logits_single_row, 0), [tf.shape(x)[0], 1, 1]
             )
             return logits_batch
 
