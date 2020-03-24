@@ -403,7 +403,7 @@ class DenseTargetLossTest(tf.test.TestCase):
         )
 
         calculated_loss = h.history["loss"][0]
-        self.assertAllClose(calculated_loss, expected_loss)
+        np.testing.assert_allclose(calculated_loss, expected_loss, rtol=1e-6, atol=1e-6)
 
 
 if __name__ == "__main__":
