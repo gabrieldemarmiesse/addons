@@ -329,7 +329,12 @@ def get_test_data():
     batch_size = 2
     sequence_length = 3
     number_of_classes = 5
-    return batch_size, sequence_length, number_of_classes
+    logits = [
+        tf.constant(i + 0.5, shape=[batch_size, number_of_classes])
+        for i in range(sequence_length)
+    ]
+    logits = tf.stack(logits, axis=1)
+    return batch_size, sequence_length, number_of_classes, logits
 
 
 @test_utils.run_all_in_graph_and_eager_modes
@@ -345,12 +350,7 @@ class DenseTargetLossTest(tf.test.TestCase):
         parameters, no matter how many steps we train it, it always
         outputs the same loss value.
         """
-        batch_size, sequence_length, number_of_classes = get_test_data()
-        logits = [
-            tf.constant(i + 0.5, shape=[batch_size, number_of_classes])
-            for i in range(sequence_length)
-        ]
-        self.logits = tf.stack(logits, axis=1)
+        batch_size, sequence_length, number_of_classes, logits = get_test_data()
         targets = [
             tf.constant(i, tf.int32, shape=[batch_size]) for i in range(sequence_length)
         ]
@@ -364,7 +364,7 @@ class DenseTargetLossTest(tf.test.TestCase):
         self.targets = tf.one_hot(self.targets, depth=number_of_classes)
 
         def return_logits(x):
-            logits_single_row = self.logits[0, :, :]
+            logits_single_row = logits[0, :, :]
             logits_batch = tf.tile(
                 tf.expand_dims(logits_single_row, 0), [tf.shape(x)[0], 1, 1]
             )
