@@ -356,54 +356,52 @@ def get_test_data():
     )
 
 
-@test_utils.run_all_in_graph_and_eager_modes
-class DenseTargetLossTest(tf.test.TestCase):
-    @pytest.mark.xfail(tf.__version__ == "2.2.0-rc1", reason="TODO: Fix this test")
-    def testKerasCompatibility(self):
-        """To test the compatibility of SequenceLoss with Keras's built-in
-        training loops, we create a fake model which always outputs a pre-
-        defined set of logits.
+@pytest.mark.xfail(tf.__version__ == "2.2.0-rc1", reason="TODO: Fix this test")
+def test_keras_compatibility():
+    """To test the compatibility of SequenceLoss with Keras's built-in
+    training loops, we create a fake model which always outputs a pre-
+    defined set of logits.
 
-        Then we check the calculated loss to be equal to the expected
-        loss. Note that since the fake model doesn't have any trainable
-        parameters, no matter how many steps we train it, it always
-        outputs the same loss value.
-        """
-        (
-            batch_size,
-            sequence_length,
-            number_of_classes,
-            logits,
-            targets,
-            weights,
-            expected_loss,
-        ) = get_test_data()
+    Then we check the calculated loss to be equal to the expected
+    loss. Note that since the fake model doesn't have any trainable
+    parameters, no matter how many steps we train it, it always
+    outputs the same loss value.
+    """
+    (
+        batch_size,
+        sequence_length,
+        number_of_classes,
+        logits,
+        targets,
+        weights,
+        expected_loss,
+    ) = get_test_data()
 
-        def return_logits(x):
-            logits_single_row = logits[0, :, :]
-            logits_batch = tf.tile(
-                tf.expand_dims(logits_single_row, 0), [tf.shape(x)[0], 1, 1]
-            )
-            return logits_batch
-
-        inp = tf.keras.layers.Input(shape=(sequence_length,))
-        out = tf.keras.layers.Lambda(
-            return_logits, output_shape=(sequence_length, number_of_classes),
-        )(inp)
-        model = tf.keras.models.Model(inp, out)
-
-        loss_obj = loss.SequenceLoss()
-        model.compile(optimizer="adam", loss=loss_obj, sample_weight_mode="temporal")
-
-        # This is a fake input.
-        x = tf.ones(shape=(batch_size, sequence_length))
-
-        h = model.fit(
-            x, targets, sample_weight=weights, batch_size=batch_size, steps_per_epoch=1,
+    def return_logits(x):
+        logits_single_row = logits[0, :, :]
+        logits_batch = tf.tile(
+            tf.expand_dims(logits_single_row, 0), [tf.shape(x)[0], 1, 1]
         )
+        return logits_batch
 
-        calculated_loss = h.history["loss"][0]
-        np.testing.assert_allclose(calculated_loss, expected_loss, rtol=1e-6, atol=1e-6)
+    inp = tf.keras.layers.Input(shape=(sequence_length,))
+    out = tf.keras.layers.Lambda(
+        return_logits, output_shape=(sequence_length, number_of_classes),
+    )(inp)
+    model = tf.keras.models.Model(inp, out)
+
+    loss_obj = loss.SequenceLoss()
+    model.compile(optimizer="adam", loss=loss_obj, sample_weight_mode="temporal")
+
+    # This is a fake input.
+    x = tf.ones(shape=(batch_size, sequence_length))
+
+    h = model.fit(
+        x, targets, sample_weight=weights, batch_size=batch_size, steps_per_epoch=1,
+    )
+
+    calculated_loss = h.history["loss"][0]
+    np.testing.assert_allclose(calculated_loss, expected_loss, rtol=1e-6, atol=1e-6)
 
 
 if __name__ == "__main__":
