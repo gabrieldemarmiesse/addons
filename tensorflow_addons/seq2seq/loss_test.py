@@ -105,7 +105,7 @@ def test_sequence_loss(average_across_timesteps, average_across_batch, zero_weig
 @pytest.mark.usefixtures("maybe_run_functions_eagerly")
 @pytest.mark.parametrize("average_across_timesteps", [True, False])
 @pytest.mark.parametrize("average_across_batch", [True, False])
-def test_stuff(average_across_timesteps, average_across_batch):
+def test_sequence_loss_class(average_across_timesteps, average_across_batch):
 
     (
         batch_size,
