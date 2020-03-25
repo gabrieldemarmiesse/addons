@@ -172,17 +172,6 @@ class LossTest(tf.test.TestCase):
             self.setup()
 
             seq_loss = loss.SequenceLoss(
-                average_across_timesteps=True,
-                average_across_batch=False,
-                sum_over_timesteps=False,
-                sum_over_batch=False,
-            )
-            average_loss_per_batch = seq_loss(self.targets, self.logits, self.weights)
-            res = self.evaluate(average_loss_per_batch)
-            compare_per_batch = np.full((self.batch_size), self.expected_loss)
-            self.assertAllClose(compare_per_batch, res)
-
-            seq_loss = loss.SequenceLoss(
                 average_across_timesteps=False,
                 average_across_batch=False,
                 sum_over_timesteps=False,
