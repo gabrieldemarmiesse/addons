@@ -108,6 +108,7 @@ def test_sequence_loss(average_across_timesteps, average_across_batch, zero_weig
         (True, True, False, False),
         (False, True, False, False),
         (True, False, False, False),
+        (False, False, False, False),
     ],
 )
 def test_stuff(
@@ -137,8 +138,10 @@ def test_stuff(
         expected = np.full(sequence_length, expected_loss)
     elif average_across_timesteps and not average_across_batch:
         expected = np.full(batch_size, expected_loss)
+    elif not average_across_timesteps and not average_across_batch:
+        expected = np.full((batch_size, sequence_length), expected_loss)
 
-    np.testing.assert_allclose(expected, res, atol=1e-6, rtol=1e-6)
+    np.testing.assert_allclose(res, expected, atol=1e-6, rtol=1e-6)
 
 
 @test_utils.run_all_in_graph_and_eager_modes
@@ -166,23 +169,6 @@ class LossTest(tf.test.TestCase):
         # logits) where targets = [0, 1, 2],
         # and logits = [[0.5] * 5, [1.5] * 5, [2.5] * 5]
         self.expected_loss = 1.60944
-
-    def testSequenceLossClass(self):
-        with self.cached_session(use_gpu=True):
-            self.setup()
-
-            seq_loss = loss.SequenceLoss(
-                average_across_timesteps=False,
-                average_across_batch=False,
-                sum_over_timesteps=False,
-                sum_over_batch=False,
-            )
-            total_loss = seq_loss(self.targets, self.logits, self.weights)
-            res = self.evaluate(total_loss)
-            compare_total = np.full(
-                (self.batch_size, self.sequence_length), self.expected_loss
-            )
-            self.assertAllClose(compare_total, res)
 
     def testSumReduction(self):
         with self.cached_session(use_gpu=True):
