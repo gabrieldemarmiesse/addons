@@ -102,36 +102,36 @@ def test_sequence_loss(average_across_timesteps, average_across_batch, zero_weig
     np.testing.assert_allclose(computed, expected, rtol=1e-6, atol=1e-6)
 
 
-def test_stuff():
+@pytest.mark.parametrize(
+    "average_across_timesteps, average_across_batch, sum_over_timesteps, sum_over_batch",
+    [(True, True, False, False), (False, True, False, False)],
+)
+def test_stuff(
+    average_across_timesteps, average_across_batch, sum_over_timesteps, sum_over_batch
+):
 
-    for (
-        average_across_timesteps,
-        average_across_batch,
-        sum_over_timesteps,
-        sum_over_batch,
-    ) in [(True, True, False, False), (False, True, False, False)]:
-        (
-            batch_size,
-            sequence_length,
-            _,
-            logits,
-            targets,
-            weights,
-            expected_loss,
-        ) = get_test_data()
-        seq_loss = loss.SequenceLoss(
-            average_across_timesteps=average_across_timesteps,
-            average_across_batch=average_across_batch,
-            sum_over_timesteps=sum_over_timesteps,
-            sum_over_batch=sum_over_batch,
-        )
-        average_loss_per_example = seq_loss(targets, logits, weights)
-        res = average_loss_per_example.numpy()
-        if average_across_timesteps:
-            expected = expected_loss
-        else:
-            expected = np.full(sequence_length, expected_loss)
-        np.testing.assert_allclose(expected, res, atol=1e-6, rtol=1e-6)
+    (
+        batch_size,
+        sequence_length,
+        _,
+        logits,
+        targets,
+        weights,
+        expected_loss,
+    ) = get_test_data()
+    seq_loss = loss.SequenceLoss(
+        average_across_timesteps=average_across_timesteps,
+        average_across_batch=average_across_batch,
+        sum_over_timesteps=sum_over_timesteps,
+        sum_over_batch=sum_over_batch,
+    )
+    average_loss_per_example = seq_loss(targets, logits, weights)
+    res = average_loss_per_example.numpy()
+    if average_across_timesteps:
+        expected = expected_loss
+    else:
+        expected = np.full(sequence_length, expected_loss)
+    np.testing.assert_allclose(expected, res, atol=1e-6, rtol=1e-6)
 
 
 @test_utils.run_all_in_graph_and_eager_modes
