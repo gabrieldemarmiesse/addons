@@ -102,18 +102,10 @@ def test_sequence_loss(average_across_timesteps, average_across_batch, zero_weig
     np.testing.assert_allclose(computed, expected, rtol=1e-6, atol=1e-6)
 
 
-@pytest.mark.parametrize(
-    "average_across_timesteps, average_across_batch, sum_over_timesteps, sum_over_batch",
-    [
-        (True, True, False, False),
-        (False, True, False, False),
-        (True, False, False, False),
-        (False, False, False, False),
-    ],
-)
-def test_stuff(
-    average_across_timesteps, average_across_batch, sum_over_timesteps, sum_over_batch
-):
+@pytest.mark.usefixtures("maybe_run_functions_eagerly")
+@pytest.mark.parametrize("average_across_timesteps", [True, False])
+@pytest.mark.parametrize("average_across_batch", [True, False])
+def test_stuff(average_across_timesteps, average_across_batch):
 
     (
         batch_size,
@@ -127,8 +119,8 @@ def test_stuff(
     seq_loss = loss.SequenceLoss(
         average_across_timesteps=average_across_timesteps,
         average_across_batch=average_across_batch,
-        sum_over_timesteps=sum_over_timesteps,
-        sum_over_batch=sum_over_batch,
+        sum_over_timesteps=False,
+        sum_over_batch=False,
     )
     average_loss_per_example = seq_loss(targets, logits, weights)
     res = average_loss_per_example.numpy()
