@@ -17,6 +17,7 @@ on:
 env:
   BAZEL_VERSION: 1.1.0
   OLDEST_PY_VERSION: '3.5'
+  NEWEST_PY_VERSION: '3.8'
 
 jobs:
   test-with-bazel:
@@ -39,7 +40,8 @@ jobs:
     strategy:
       matrix:
         os: ['macos-latest', 'windows-latest', 'ubuntu-18.04']
-        python-version: ['3.5', '3.6', '3.7']
+        python-version: ['3.5', '3.6', '3.7', '3.8']
+        tf-version: ['2.1.0', '2.2.0rc1']
       fail-fast: false
     steps:
       - if: github.event_name == 'push'
@@ -49,10 +51,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Build wheels
-        if: github.event_name == 'push' || github.event_name == 'release' || matrix.python-version == env.OLDEST_PY_VERSION
+        if: >-
+          !((matrix.os == 'macos-latest' && matrix.python-version == '3.8')
+          || (matrix.python-version == '3.8' && matrix.tf-version == '2.1.0')
+          || (matrix.tf-versionmatrix.os == 'ubuntu-18.04' && matrix)
+          || (github.event_name == 'pull_request' && (matrix.python-version != env.OLDEST_PY_VERSION || matrix.python-version != env.NEWEST_PY_VERSION)))
         env:
-          PY_VERSION: ${{ matrix.python-version }}
           OS: ${{ runner.os }}
+          PY_VERSION: ${{ matrix.python-version }}
+          TF_VERSION: ${{ matrix.tf-version }}
         shell: bash
         run: bash .github/workflows/make_wheel_${OS}.sh
       - uses: actions/upload-artifact@v1
