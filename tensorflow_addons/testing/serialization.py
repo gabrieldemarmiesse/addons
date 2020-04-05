@@ -3,6 +3,7 @@ import inspect
 
 import numpy as np
 from tensorflow.keras.metrics import Metric
+from tensorflow.keras.layers import Layer, serialize
 import typeguard
 
 
@@ -47,6 +48,33 @@ def check_metric_serialization(
             "a result of {} after the same "
             "call.".format(metric_result, metric_copy_result)
         )
+
+
+@typeguard.typechecked
+def check_layer_serialization(
+    layer: Layer, input_data: Union[tuple, np.ndarray], strict: bool = True,
+):
+
+    layer.build(input_data.shape)
+    config = layer.get_config()
+
+    class_ = layer.__class__
+
+    check_config(config, class_, strict)
+
+    layer_copy = class_.from_config(config)
+    layer_copy.set_weights(layer.get_weights())
+
+    if isinstance(input_data, tuple):
+        input_data = get_random_array(input_data)
+
+    output_data = layer(input_data).numpy()
+    output_data_copy = layer_copy(input_data).numpy()
+
+    if isinstance(output_data, list):
+        assert_all_arrays_close(output_data, output_data_copy)
+    else:
+        np.testing.assert_allclose(output_data, output_data_copy)
 
 
 def check_config(config, class_, strict):
