@@ -1,18 +1,20 @@
-from typing import Union
+from typing import Union, List, Optional
 import inspect
 
 import numpy as np
 from tensorflow.keras.metrics import Metric
-from tensorflow.keras.layers import Layer, serialize
+from tensorflow.keras.layers import Layer
 import typeguard
+
+ShapeOrArray = Union[tuple, np.ndarray]
 
 
 @typeguard.typechecked
 def check_metric_serialization(
     metric: Metric,
-    y_true: Union[tuple, np.ndarray],
-    y_pred: Union[tuple, np.ndarray],
-    sample_weight: Union[tuple, np.ndarray, None] = None,
+    y_true: ShapeOrArray,
+    y_pred: ShapeOrArray,
+    sample_weight: Optional[ShapeOrArray] = None,
     strict: bool = True,
 ):
     config = metric.get_config()
@@ -52,24 +54,34 @@ def check_metric_serialization(
 
 @typeguard.typechecked
 def check_layer_serialization(
-    layer: Layer, input_data: Union[tuple, np.ndarray], strict: bool = True,
+    layer: Layer,
+    input_data: Union[ShapeOrArray, List[ShapeOrArray]],
+    strict: bool = True,
 ):
+    if isinstance(input_data, tuple):
+        input_data = get_random_array(input_data)
+    if isinstance(input_data, list) and isinstance(input_data[0], tuple):
+        input_data = [get_random_array(x) for x in input_data]
+    if isinstance(input_data, list):
+        input_shape = [x.shape for x in input_data]
+    else:
+        input_shape = input_data.shape
 
-    layer.build(input_data.shape)
+    layer.build(input_shape)
     config = layer.get_config()
-
     class_ = layer.__class__
 
     check_config(config, class_, strict)
 
     layer_copy = class_.from_config(config)
+    layer_copy.build(input_shape)
     layer_copy.set_weights(layer.get_weights())
 
-    if isinstance(input_data, tuple):
-        input_data = get_random_array(input_data)
+    assert layer.name == layer_copy.name
+    assert layer.dtype == layer_copy.dtype
 
-    output_data = layer(input_data).numpy()
-    output_data_copy = layer_copy(input_data).numpy()
+    output_data = [x.numpy() for x in to_list(layer(input_data))]
+    output_data_copy = [x.numpy() for x in to_list(layer_copy(input_data))]
 
     if isinstance(output_data, list):
         assert_all_arrays_close(output_data, output_data_copy)
@@ -83,26 +95,32 @@ def check_config(config, class_, strict):
     for parameter_name in init_signature.parameters:
         if parameter_name == "self":
             continue
-        elif parameter_name == "args" and strict:
-            raise KeyError(
-                "Please do not use args in the class constructor of {}, "
-                "as it hides the real signature "
-                "and degrades the user experience. "
-                "If you have no alternative to *args, "
-                "use `strict=False` in check_metric_serialization.".format(
-                    class_.__name__
+        elif parameter_name == "args":
+            if strict:
+                raise KeyError(
+                    "Please do not use args in the class constructor of {}, "
+                    "as it hides the real signature "
+                    "and degrades the user experience. "
+                    "If you have no alternative to *args, "
+                    "use `strict=False` in check_metric_serialization.".format(
+                        class_.__name__
+                    )
                 )
-            )
-        elif parameter_name == "kwargs" and strict:
-            raise KeyError(
-                "Please do not use kwargs in the class constructor of {}, "
-                "as it hides the real signature "
-                "and degrades the user experience. "
-                "If you have no alternative to **kwargs, "
-                "use `strict=False` in check_metric_serialization.".format(
-                    class_.__name__
+            else:
+                continue
+        elif parameter_name == "kwargs":
+            if strict:
+                raise KeyError(
+                    "Please do not use kwargs in the class constructor of {}, "
+                    "as it hides the real signature "
+                    "and degrades the user experience. "
+                    "If you have no alternative to **kwargs, "
+                    "use `strict=False` in check_metric_serialization.".format(
+                        class_.__name__
+                    )
                 )
-            )
+            else:
+                continue
         if parameter_name not in config:
             raise KeyError(
                 "The constructor parameter {} is not present in the config dict "
@@ -110,6 +128,12 @@ def check_config(config, class_, strict):
                 "ensure a perfect copy of the keras object can be obtained when "
                 "serialized.".format(parameter_name, class_.__name__)
             )
+
+
+def to_list(x):
+    if isinstance(x, list):
+        return x
+    return [x]
 
 
 def assert_all_arrays_close(list1, list2):

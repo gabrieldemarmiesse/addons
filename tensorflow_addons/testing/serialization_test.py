@@ -1,9 +1,12 @@
 import numpy as np
 import pytest
 import tensorflow as tf
-
 from tensorflow.keras.metrics import MeanAbsoluteError, TrueNegatives, Metric
+from tensorflow.keras.layers import Dense, Subtract, Layer
+
+
 from tensorflow_addons.testing.serialization import check_metric_serialization
+from tensorflow_addons.testing.serialization import check_layer_serialization
 
 
 def test_check_metric_serialization_mae():
@@ -68,3 +71,31 @@ class MyOtherDummyMetric(Metric):
 def test_wrong_serialization():
     with pytest.raises(AssertionError):
         check_metric_serialization(MyOtherDummyMetric(5), (2,), (2,))
+
+
+def test_check_layer_serialization_dense():
+    check_layer_serialization(
+        Dense(4, activation="relu", use_bias=False, dtype=tf.float64),
+        input_data=(6, 2),
+        strict=False,
+    )
+
+
+def test_check_layer_serialization_multi_input():
+    check_layer_serialization(
+        Subtract(name="my_substract"), input_data=[(4, 2), (4, 2)], strict=False
+    )
+
+
+class DummyMultiOutputLayer(Layer):
+    def __init__(self, name=None, dtype=None, **kwargs):
+        super().__init__(name=name, dtype=dtype, **kwargs)
+
+    def call(self, inputs):
+        return [inputs, tf.reduce_sum(inputs, 1)]
+
+
+def test_check_layer_serialization_multi_output():
+    check_layer_serialization(
+        DummyMultiOutputLayer(), input_data=(4, 2, 3), strict=False
+    )
