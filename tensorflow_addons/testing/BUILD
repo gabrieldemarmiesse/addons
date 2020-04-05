@@ -7,6 +7,7 @@ py_library(
     srcs = [
         "__init__.py",
         "serialization.py",
+        "check_layer.py",
     ],
 )
 
