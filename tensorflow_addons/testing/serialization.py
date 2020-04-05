@@ -82,11 +82,7 @@ def check_layer_serialization(
 
     output_data = [x.numpy() for x in to_list(layer(input_data))]
     output_data_copy = [x.numpy() for x in to_list(layer_copy(input_data))]
-
-    if isinstance(output_data, list):
-        assert_all_arrays_close(output_data, output_data_copy)
-    else:
-        np.testing.assert_allclose(output_data, output_data_copy)
+    assert_all_arrays_close(output_data, output_data_copy)
 
 
 def check_config(config, class_, strict):
