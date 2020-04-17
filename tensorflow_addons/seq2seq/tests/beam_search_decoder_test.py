@@ -15,6 +15,7 @@
 """Tests for tfa.seq2seq.seq2seq.beam_search_decoder."""
 
 import numpy as np
+import pytest
 import tensorflow as tf
 
 from tensorflow_addons.seq2seq import attention_wrapper
@@ -52,7 +53,10 @@ def test_gather_tree():
     np.testing.assert_equal(expected_result, res)
 
 
-def _test_gather_tree_from_array(depth_ndims=0, merged_batch_beam=False):
+@pytest.mark.parametrize(
+    "depth_ndims, merged_batch_beam", [(0, False), (1, False), (1, True), (2, False)]
+)
+def test_gather_tree_from_array(depth_ndims, merged_batch_beam):
     array = np.array(
         [
             [[1, 2, 3], [4, 5, 6], [7, 8, 9], [0, 0, 0]],
@@ -101,22 +105,6 @@ def _test_gather_tree_from_array(depth_ndims=0, merged_batch_beam=False):
     )
 
     np.testing.assert_equal(expected_array.numpy(), sorted_array.numpy())
-
-
-def test_gather_tree_from_array_scalar():
-    _test_gather_tree_from_array()
-
-
-def test_gather_tree_from_array_1d():
-    _test_gather_tree_from_array(depth_ndims=1)
-
-
-def test_gather_tree_from_array_1d_with_merged_batch_beam():
-    _test_gather_tree_from_array(depth_ndims=1, merged_batch_beam=True)
-
-
-def test_gather_tree_from_array_2d():
-    _test_gather_tree_from_array(depth_ndims=2)
 
 
 class TestGatherTree(tf.test.TestCase):
