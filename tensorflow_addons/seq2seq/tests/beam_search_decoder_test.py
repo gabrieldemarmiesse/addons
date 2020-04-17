@@ -20,7 +20,6 @@ import tensorflow as tf
 
 from tensorflow_addons.seq2seq import attention_wrapper
 from tensorflow_addons.seq2seq import beam_search_decoder, gather_tree
-from tensorflow_addons.utils import test_utils
 
 
 def test_gather_tree():
@@ -390,105 +389,94 @@ def test_step_with_eos():
     np.testing.assert_equal(next_beam_state.log_probs.numpy(), expected_log_probs)
 
 
-class TestLargeBeamStep(tf.test.TestCase):
+def test_step_large_beam():
     """Tests large beam step.
 
     Tests a single step of beam search in such case that beam size is
     larger than vocabulary size.
     """
+    batch_size = 2
+    beam_width = 8
+    vocab_size = 5
+    end_token = 0
+    length_penalty_weight = 0.6
+    coverage_penalty_weight = 0.0
 
-    def setUp(self):
-        super().setUp()
-        self.batch_size = 2
-        self.beam_width = 8
-        self.vocab_size = 5
-        self.end_token = 0
-        self.length_penalty_weight = 0.6
-        self.coverage_penalty_weight = 0.0
-
-    def test_step(self):
-        def get_probs():
-            """this simulates the initialize method in BeamSearchDecoder."""
-            log_prob_mask = tf.one_hot(
-                tf.zeros([self.batch_size], dtype=tf.int32),
-                depth=self.beam_width,
-                on_value=True,
-                off_value=False,
-                dtype=tf.bool,
-            )
-
-            log_prob_zeros = tf.zeros(
-                [self.batch_size, self.beam_width], dtype=tf.float32
-            )
-            log_prob_neg_inf = (
-                tf.ones([self.batch_size, self.beam_width], dtype=tf.float32) * -np.Inf
-            )
-
-            log_probs = tf.where(log_prob_mask, log_prob_zeros, log_prob_neg_inf)
-            return log_probs
-
-        log_probs = get_probs()
-        dummy_cell_state = tf.zeros([self.batch_size, self.beam_width])
-
-        _finished = tf.one_hot(
-            tf.zeros([self.batch_size], dtype=tf.int32),
-            depth=self.beam_width,
-            on_value=False,
-            off_value=True,
+    def get_probs():
+        """this simulates the initialize method in BeamSearchDecoder."""
+        log_prob_mask = tf.one_hot(
+            tf.zeros([batch_size], dtype=tf.int32),
+            depth=beam_width,
+            on_value=True,
+            off_value=False,
             dtype=tf.bool,
         )
-        _lengths = np.zeros([self.batch_size, self.beam_width], dtype=np.int64)
-        _lengths[:, 0] = 2
-        _lengths = tf.constant(_lengths, dtype=tf.int64)
 
-        beam_state = beam_search_decoder.BeamSearchDecoderState(
-            cell_state=dummy_cell_state,
-            log_probs=log_probs,
-            lengths=_lengths,
-            finished=_finished,
-            accumulated_attention_probs=(),
-        )
+        log_prob_zeros = tf.zeros([batch_size, beam_width], dtype=tf.float32)
+        log_prob_neg_inf = tf.ones([batch_size, beam_width], dtype=tf.float32) * -np.Inf
 
-        logits_ = np.full([self.batch_size, self.beam_width, self.vocab_size], 0.0001)
-        logits_[0, 0, 2] = 1.9
-        logits_[0, 0, 3] = 2.1
-        logits_[0, 1, 3] = 3.1
-        logits_[0, 1, 4] = 0.9
-        logits_[1, 0, 1] = 0.5
-        logits_[1, 1, 2] = 2.7
-        logits_[1, 2, 2] = 10.0
-        logits_[1, 2, 3] = 0.2
-        logits = tf.constant(logits_, dtype=tf.float32)
-        log_probs = tf.nn.log_softmax(logits)
+        log_probs = tf.where(log_prob_mask, log_prob_zeros, log_prob_neg_inf)
+        return log_probs
 
-        outputs, next_beam_state = beam_search_decoder._beam_search_step(
-            time=2,
-            logits=logits,
-            next_cell_state=dummy_cell_state,
-            beam_state=beam_state,
-            batch_size=tf.convert_to_tensor(self.batch_size),
-            beam_width=self.beam_width,
-            end_token=self.end_token,
-            length_penalty_weight=self.length_penalty_weight,
-            coverage_penalty_weight=self.coverage_penalty_weight,
-        )
+    log_probs = get_probs()
+    dummy_cell_state = tf.zeros([batch_size, beam_width])
 
-        with self.cached_session() as sess:
-            outputs_, next_state_, _, _ = sess.run(
-                [outputs, next_beam_state, beam_state, log_probs]
-            )
+    _finished = tf.one_hot(
+        tf.zeros([batch_size], dtype=tf.int32),
+        depth=beam_width,
+        on_value=False,
+        off_value=True,
+        dtype=tf.bool,
+    )
+    _lengths = np.zeros([batch_size, beam_width], dtype=np.int64)
+    _lengths[:, 0] = 2
+    _lengths = tf.constant(_lengths, dtype=tf.int64)
 
-        self.assertEqual(outputs_.predicted_ids[0, 0], 3)
-        self.assertEqual(outputs_.predicted_ids[0, 1], 2)
-        self.assertEqual(outputs_.predicted_ids[1, 0], 1)
-        neg_inf = -np.Inf
-        self.assertAllEqual(
-            next_state_.log_probs[:, -3:],
-            [[neg_inf, neg_inf, neg_inf], [neg_inf, neg_inf, neg_inf]],
-        )
-        self.assertEqual((next_state_.log_probs[:, :-3] > neg_inf).all(), True)
-        self.assertEqual((next_state_.lengths[:, :-3] > 0).all(), True)
-        self.assertAllEqual(next_state_.lengths[:, -3:], [[0, 0, 0], [0, 0, 0]])
+    beam_state = beam_search_decoder.BeamSearchDecoderState(
+        cell_state=dummy_cell_state,
+        log_probs=log_probs,
+        lengths=_lengths,
+        finished=_finished,
+        accumulated_attention_probs=(),
+    )
+
+    logits_ = np.full([batch_size, beam_width, vocab_size], 0.0001)
+    logits_[0, 0, 2] = 1.9
+    logits_[0, 0, 3] = 2.1
+    logits_[0, 1, 3] = 3.1
+    logits_[0, 1, 4] = 0.9
+    logits_[1, 0, 1] = 0.5
+    logits_[1, 1, 2] = 2.7
+    logits_[1, 2, 2] = 10.0
+    logits_[1, 2, 3] = 0.2
+    logits = tf.constant(logits_, dtype=tf.float32)
+    log_probs = tf.nn.log_softmax(logits)
+
+    outputs, next_beam_state = beam_search_decoder._beam_search_step(
+        time=2,
+        logits=logits,
+        next_cell_state=dummy_cell_state,
+        beam_state=beam_state,
+        batch_size=tf.convert_to_tensor(batch_size),
+        beam_width=beam_width,
+        end_token=end_token,
+        length_penalty_weight=length_penalty_weight,
+        coverage_penalty_weight=coverage_penalty_weight,
+    )
+
+    assert outputs.predicted_ids[0, 0] == 3
+    assert outputs.predicted_ids[0, 1] == 2
+    assert outputs.predicted_ids[1, 0] == 1
+    neg_inf = -np.Inf
+    np.testing.assert_equal(
+        next_beam_state.log_probs[:, -3:],
+        np.array([[neg_inf, neg_inf, neg_inf], [neg_inf, neg_inf, neg_inf]]),
+    )
+    assert (next_beam_state.log_probs[:, :-3] > neg_inf).numpy().all()
+    assert (next_beam_state.lengths[:, :-3] > 0).numpy().all()
+    np.testing.assert_equal(
+        next_beam_state.lengths[:, -3:], np.array([[0, 0, 0], [0, 0, 0]])
+    )
 
 
 @pytest.mark.parametrize(
