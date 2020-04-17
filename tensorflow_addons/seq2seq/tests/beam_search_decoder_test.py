@@ -268,133 +268,126 @@ def test_eos_masking():
         np.testing.assert_allclose(masked[1][2][i], np.finfo("float32").min)
 
 
-class TestBeamStep(tf.test.TestCase):
-    """Tests a single step of beam search."""
+def test_step():
+    batch_size = 2
+    beam_width = 3
+    vocab_size = 5
+    end_token = 0
+    length_penalty_weight = 0.6
+    coverage_penalty_weight = 0.0
+    dummy_cell_state = tf.zeros([batch_size, beam_width])
+    beam_state = beam_search_decoder.BeamSearchDecoderState(
+        cell_state=dummy_cell_state,
+        log_probs=tf.nn.log_softmax(tf.ones([batch_size, beam_width])),
+        lengths=tf.constant(2, shape=[batch_size, beam_width], dtype=tf.int64),
+        finished=tf.zeros([batch_size, beam_width], dtype=tf.bool),
+        accumulated_attention_probs=(),
+    )
 
-    def setUp(self):
-        super().setUp()
-        self.batch_size = 2
-        self.beam_width = 3
-        self.vocab_size = 5
-        self.end_token = 0
-        self.length_penalty_weight = 0.6
-        self.coverage_penalty_weight = 0.0
+    logits_ = np.full([batch_size, beam_width, vocab_size], 0.0001)
+    logits_[0, 0, 2] = 1.9
+    logits_[0, 0, 3] = 2.1
+    logits_[0, 1, 3] = 3.1
+    logits_[0, 1, 4] = 0.9
+    logits_[1, 0, 1] = 0.5
+    logits_[1, 1, 2] = 2.7
+    logits_[1, 2, 2] = 10.0
+    logits_[1, 2, 3] = 0.2
+    logits = tf.convert_to_tensor(logits_, dtype=tf.float32)
+    log_probs = tf.nn.log_softmax(logits)
 
-    def test_step(self):
-        dummy_cell_state = tf.zeros([self.batch_size, self.beam_width])
-        beam_state = beam_search_decoder.BeamSearchDecoderState(
-            cell_state=dummy_cell_state,
-            log_probs=tf.nn.log_softmax(tf.ones([self.batch_size, self.beam_width])),
-            lengths=tf.constant(
-                2, shape=[self.batch_size, self.beam_width], dtype=tf.int64
-            ),
-            finished=tf.zeros([self.batch_size, self.beam_width], dtype=tf.bool),
-            accumulated_attention_probs=(),
-        )
+    outputs, next_beam_state = beam_search_decoder._beam_search_step(
+        time=2,
+        logits=logits,
+        next_cell_state=dummy_cell_state,
+        beam_state=beam_state,
+        batch_size=tf.convert_to_tensor(batch_size),
+        beam_width=beam_width,
+        end_token=end_token,
+        length_penalty_weight=length_penalty_weight,
+        coverage_penalty_weight=coverage_penalty_weight,
+    )
 
-        logits_ = np.full([self.batch_size, self.beam_width, self.vocab_size], 0.0001)
-        logits_[0, 0, 2] = 1.9
-        logits_[0, 0, 3] = 2.1
-        logits_[0, 1, 3] = 3.1
-        logits_[0, 1, 4] = 0.9
-        logits_[1, 0, 1] = 0.5
-        logits_[1, 1, 2] = 2.7
-        logits_[1, 2, 2] = 10.0
-        logits_[1, 2, 3] = 0.2
-        logits = tf.convert_to_tensor(logits_, dtype=tf.float32)
-        log_probs = tf.nn.log_softmax(logits)
+    log_probs_ = log_probs.numpy()
 
-        outputs, next_beam_state = beam_search_decoder._beam_search_step(
-            time=2,
-            logits=logits,
-            next_cell_state=dummy_cell_state,
-            beam_state=beam_state,
-            batch_size=tf.convert_to_tensor(self.batch_size),
-            beam_width=self.beam_width,
-            end_token=self.end_token,
-            length_penalty_weight=self.length_penalty_weight,
-            coverage_penalty_weight=self.coverage_penalty_weight,
-        )
+    np.testing.assert_equal(outputs.predicted_ids.numpy(), [[3, 3, 2], [2, 2, 1]])
+    np.testing.assert_equal(outputs.parent_ids.numpy(), [[1, 0, 0], [2, 1, 0]])
+    np.testing.assert_equal(next_beam_state.lengths.numpy(), [[3, 3, 3], [3, 3, 3]])
+    np.testing.assert_equal(
+        next_beam_state.finished.numpy(), [[False, False, False], [False, False, False]]
+    )
 
-        with self.cached_session() as sess:
-            outputs_, next_state_, state_, log_probs_ = sess.run(
-                [outputs, next_beam_state, beam_state, log_probs]
-            )
+    expected_log_probs = []
+    expected_log_probs.append(beam_state.log_probs.numpy()[0][[1, 0, 0]])
+    expected_log_probs.append(beam_state.log_probs.numpy()[1][[2, 1, 0]])  # 0 --> 1
+    expected_log_probs[0][0] += log_probs_[0, 1, 3]
+    expected_log_probs[0][1] += log_probs_[0, 0, 3]
+    expected_log_probs[0][2] += log_probs_[0, 0, 2]
+    expected_log_probs[1][0] += log_probs_[1, 2, 2]
+    expected_log_probs[1][1] += log_probs_[1, 1, 2]
+    expected_log_probs[1][2] += log_probs_[1, 0, 1]
+    np.testing.assert_equal(next_beam_state.log_probs.numpy(), expected_log_probs)
 
-        self.assertAllEqual(outputs_.predicted_ids, [[3, 3, 2], [2, 2, 1]])
-        self.assertAllEqual(outputs_.parent_ids, [[1, 0, 0], [2, 1, 0]])
-        self.assertAllEqual(next_state_.lengths, [[3, 3, 3], [3, 3, 3]])
-        self.assertAllEqual(
-            next_state_.finished, [[False, False, False], [False, False, False]]
-        )
 
-        expected_log_probs = []
-        expected_log_probs.append(state_.log_probs[0][[1, 0, 0]])
-        expected_log_probs.append(state_.log_probs[1][[2, 1, 0]])  # 0 --> 1
-        expected_log_probs[0][0] += log_probs_[0, 1, 3]
-        expected_log_probs[0][1] += log_probs_[0, 0, 3]
-        expected_log_probs[0][2] += log_probs_[0, 0, 2]
-        expected_log_probs[1][0] += log_probs_[1, 2, 2]
-        expected_log_probs[1][1] += log_probs_[1, 1, 2]
-        expected_log_probs[1][2] += log_probs_[1, 0, 1]
-        self.assertAllEqual(next_state_.log_probs, expected_log_probs)
+def test_step_with_eos():
+    batch_size = 2
+    beam_width = 3
+    vocab_size = 5
+    end_token = 0
+    length_penalty_weight = 0.6
+    coverage_penalty_weight = 0.0
+    dummy_cell_state = tf.zeros([batch_size, beam_width])
+    beam_state = beam_search_decoder.BeamSearchDecoderState(
+        cell_state=dummy_cell_state,
+        log_probs=tf.nn.log_softmax(tf.ones([batch_size, beam_width])),
+        lengths=tf.convert_to_tensor([[2, 1, 2], [2, 2, 1]], dtype=tf.int64),
+        finished=tf.convert_to_tensor(
+            [[False, True, False], [False, False, True]], dtype=tf.bool
+        ),
+        accumulated_attention_probs=(),
+    )
 
-    def test_step_with_eos(self):
-        dummy_cell_state = tf.zeros([self.batch_size, self.beam_width])
-        beam_state = beam_search_decoder.BeamSearchDecoderState(
-            cell_state=dummy_cell_state,
-            log_probs=tf.nn.log_softmax(tf.ones([self.batch_size, self.beam_width])),
-            lengths=tf.convert_to_tensor([[2, 1, 2], [2, 2, 1]], dtype=tf.int64),
-            finished=tf.convert_to_tensor(
-                [[False, True, False], [False, False, True]], dtype=tf.bool
-            ),
-            accumulated_attention_probs=(),
-        )
+    logits_ = np.full([batch_size, beam_width, vocab_size], 0.0001)
+    logits_[0, 0, 2] = 1.9
+    logits_[0, 0, 3] = 2.1
+    logits_[0, 1, 3] = 3.1
+    logits_[0, 1, 4] = 0.9
+    logits_[1, 0, 1] = 0.5
+    logits_[1, 1, 2] = 5.7  # why does this not work when it's 2.7?
+    logits_[1, 2, 2] = 1.0
+    logits_[1, 2, 3] = 0.2
+    logits = tf.convert_to_tensor(logits_, dtype=tf.float32)
+    log_probs = tf.nn.log_softmax(logits)
 
-        logits_ = np.full([self.batch_size, self.beam_width, self.vocab_size], 0.0001)
-        logits_[0, 0, 2] = 1.9
-        logits_[0, 0, 3] = 2.1
-        logits_[0, 1, 3] = 3.1
-        logits_[0, 1, 4] = 0.9
-        logits_[1, 0, 1] = 0.5
-        logits_[1, 1, 2] = 5.7  # why does this not work when it's 2.7?
-        logits_[1, 2, 2] = 1.0
-        logits_[1, 2, 3] = 0.2
-        logits = tf.convert_to_tensor(logits_, dtype=tf.float32)
-        log_probs = tf.nn.log_softmax(logits)
+    outputs, next_beam_state = beam_search_decoder._beam_search_step(
+        time=2,
+        logits=logits,
+        next_cell_state=dummy_cell_state,
+        beam_state=beam_state,
+        batch_size=tf.convert_to_tensor(batch_size),
+        beam_width=beam_width,
+        end_token=end_token,
+        length_penalty_weight=length_penalty_weight,
+        coverage_penalty_weight=coverage_penalty_weight,
+    )
 
-        outputs, next_beam_state = beam_search_decoder._beam_search_step(
-            time=2,
-            logits=logits,
-            next_cell_state=dummy_cell_state,
-            beam_state=beam_state,
-            batch_size=tf.convert_to_tensor(self.batch_size),
-            beam_width=self.beam_width,
-            end_token=self.end_token,
-            length_penalty_weight=self.length_penalty_weight,
-            coverage_penalty_weight=self.coverage_penalty_weight,
-        )
+    log_probs_ = log_probs.numpy()
 
-        with self.cached_session() as sess:
-            outputs_, next_state_, state_, log_probs_ = sess.run(
-                [outputs, next_beam_state, beam_state, log_probs]
-            )
+    np.testing.assert_equal(outputs.parent_ids.numpy(), [[1, 0, 0], [1, 2, 0]])
+    np.testing.assert_equal(outputs.predicted_ids.numpy(), [[0, 3, 2], [2, 0, 1]])
+    np.testing.assert_equal(next_beam_state.lengths.numpy(), [[1, 3, 3], [3, 1, 3]])
+    np.testing.assert_equal(
+        next_beam_state.finished.numpy(), [[True, False, False], [False, True, False]]
+    )
 
-        self.assertAllEqual(outputs_.parent_ids, [[1, 0, 0], [1, 2, 0]])
-        self.assertAllEqual(outputs_.predicted_ids, [[0, 3, 2], [2, 0, 1]])
-        self.assertAllEqual(next_state_.lengths, [[1, 3, 3], [3, 1, 3]])
-        self.assertAllEqual(
-            next_state_.finished, [[True, False, False], [False, True, False]]
-        )
-
-        expected_log_probs = []
-        expected_log_probs.append(state_.log_probs[0][[1, 0, 0]])
-        expected_log_probs.append(state_.log_probs[1][[1, 2, 0]])
-        expected_log_probs[0][1] += log_probs_[0, 0, 3]
-        expected_log_probs[0][2] += log_probs_[0, 0, 2]
-        expected_log_probs[1][0] += log_probs_[1, 1, 2]
-        expected_log_probs[1][2] += log_probs_[1, 0, 1]
-        self.assertAllEqual(next_state_.log_probs, expected_log_probs)
+    expected_log_probs = []
+    expected_log_probs.append(beam_state.log_probs.numpy()[0][[1, 0, 0]])
+    expected_log_probs.append(beam_state.log_probs.numpy()[1][[1, 2, 0]])
+    expected_log_probs[0][1] += log_probs_[0, 0, 3]
+    expected_log_probs[0][2] += log_probs_[0, 0, 2]
+    expected_log_probs[1][0] += log_probs_[1, 1, 2]
+    expected_log_probs[1][2] += log_probs_[1, 0, 1]
+    np.testing.assert_equal(next_beam_state.log_probs.numpy(), expected_log_probs)
 
 
 class TestLargeBeamStep(tf.test.TestCase):
