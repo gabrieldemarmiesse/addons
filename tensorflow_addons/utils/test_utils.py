@@ -31,7 +31,6 @@ def layer_test(
     layer_cls,
     kwargs=None,
     input_shape=None,
-    input_dtype=None,
     input_data=None,
     expected_output=None,
     expected_output_shape=None,
@@ -39,20 +38,14 @@ def layer_test(
     if input_data is None:
         if input_shape is None:
             raise ValueError("input_shape is None")
-        if not input_dtype:
-            input_dtype = "float32"
         input_data_shape = list(input_shape)
         for i, e in enumerate(input_data_shape):
             if e is None:
                 input_data_shape[i] = np.random.randint(1, 4)
         input_data = 10 * np.random.random(input_data_shape)
-        if input_dtype[:5] == "float":
-            input_data -= 0.5
-        input_data = input_data.astype(input_dtype)
+        input_data = input_data.astype(np.float32)
     elif input_shape is None:
         input_shape = input_data.shape
-    if input_dtype is None:
-        input_dtype = input_data.dtype
 
     layer = layer_cls(**kwargs)
     if expected_output_shape is not None:
