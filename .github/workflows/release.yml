@@ -68,7 +68,7 @@ jobs:
       - name: Set up Docker Buildx
         if: matrix.os == 'ubuntu-18.04'
         id: buildx
-        uses: crazy-max/ghaction-docker-buildx@v1.5
+        uses: crazy-max/ghaction-docker-buildx@v1.5.0
         with:
           buildx-version: latest
           qemu-version: latest
