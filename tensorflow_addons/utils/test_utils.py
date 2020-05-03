@@ -41,20 +41,34 @@ def layer_test(
         input_data_shape = list(input_shape)
         for i, e in enumerate(input_data_shape):
             if e is None:
-                input_data_shape[i] = np.random.randint(1, 4)
+                input_data_shape[i] = 4
         input_data = 10 * np.random.random(input_data_shape)
         input_data = input_data.astype(np.float32)
     elif input_shape is None:
         input_shape = input_data.shape
 
     layer = layer_cls(**kwargs)
+    layer(input_data).numpy()  # to make sure the layer is built and the sub-layers too.
     if expected_output_shape is not None:
         actual_output_shape = tuple(layer.compute_output_shape(input_shape))
         for actual, expected in zip(actual_output_shape, expected_output_shape):
             if expected is None:
                 continue
             assert actual == expected
-    return layer(input_data)
+
+    layer_copy = tf.keras.layers.deserialize(tf.keras.layers.serialize(layer))
+    layer_copy.build(input_shape)
+
+    layer_copy.set_weights(layer.get_weights())
+    output = layer(input_data).numpy()
+    copy_output = layer_copy(input_data).numpy()
+
+    np.testing.assert_allclose(output, copy_output, 1e-6, 1e-6)
+
+    if expected_output is not None:
+        np.testing.assert_allclose(output, expected_output, 1e-6, 1e-6)
+
+    return output
 
 
 NUMBER_OF_WORKERS = int(os.environ.get("PYTEST_XDIST_WORKER_COUNT", "1"))
