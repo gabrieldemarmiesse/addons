@@ -65,12 +65,21 @@ jobs:
         with:
           bazel-version: ${{ env.BAZEL_VERSION}}
           github-api-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        if: matrix.os == 'ubuntu-18.04'
+        id: buildx
+        uses: crazy-max/ghaction-docker-buildx@v1.5.0
+        with:
+          buildx-version: latest
+          qemu-version: latest
       - name: Build wheels
         env:
           OS: ${{ runner.os }}
           PY_VERSION: ${{ matrix.py-version }}
           TF_VERSION: ${{ matrix.tf-version }}
           NIGHTLY_TIME: ${{ steps.author-date.outputs.result }}
+          DOCKER_LOGIN: ${{ secrets.DOCKER_LOGIN }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         shell: bash
         run: bash .github/workflows/make_wheel_${OS}.sh
       - uses: actions/upload-artifact@v1
